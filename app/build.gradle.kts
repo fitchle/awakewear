@@ -43,10 +43,14 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+    dependenciesInfo {
+        includeInApk = true
+    }
+    buildToolsVersion = "35.0.0"
+    ndkVersion = "26.1.10909125"
 }
 
 dependencies {
-
     implementation(libs.play.services.wearable)
     implementation(platform(libs.compose.bom))
     implementation(libs.ui)
@@ -55,6 +59,11 @@ dependencies {
     implementation(libs.compose.foundation)
     implementation(libs.activity.compose)
     implementation(libs.core.splashscreen)
+    implementation(libs.health.services.client)
+    implementation(libs.guava)
+    implementation(libs.concurrent.futures)
+    implementation(libs.kotlinx.coroutines.guava)
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.ui.test.junit4)
     debugImplementation(libs.ui.tooling)
