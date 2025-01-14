@@ -1,14 +1,18 @@
 package com.fitchle.android.awakewear.presentation
 
 import android.content.Context
-import android.media.RingtoneManager
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -29,26 +33,38 @@ import androidx.wear.compose.material.ButtonDefaults
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
 import androidx.wear.compose.material.TimeText
-import com.fitchle.android.awakewear.R
 import com.fitchle.android.awakewear.presentation.services.SleepActivityListenerService
+import com.fitchle.android.awakewear.presentation.states.AlarmState
 import com.fitchle.android.awakewear.presentation.states.AwakeState
 import com.fitchle.android.awakewear.presentation.theme.AwakeWearTheme
 
 class MainActivity : ComponentActivity() {
+
+    @RequiresApi(Build.VERSION_CODES.S)
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
-
         super.onCreate(savedInstanceState)
-
         setTheme(android.R.style.Theme_DeviceDefault)
-
-        setContent {
-            WearApp()
-        }
 
         val sharedPref = getSharedPreferences("awake_pref", Context.MODE_PRIVATE) ?: return
         val isAwakeEnabled = sharedPref.getBoolean("awake_enabled", false)
         AwakeState.setEnabledd(isAwakeEnabled)
+
+        if (checkSelfPermission(
+                android.Manifest.permission.ACTIVITY_RECOGNITION
+            ) != PackageManager.PERMISSION_GRANTED || checkSelfPermission(
+                android.Manifest.permission.SCHEDULE_EXACT_ALARM
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(
+                arrayOf(android.Manifest.permission.ACTIVITY_RECOGNITION, android.Manifest.permission.SCHEDULE_EXACT_ALARM),
+                100
+            )
+        }
+
+        setContent {
+            WearApp()
+        }
 
         val healthClient = HealthServices.getClient(this /*context*/)
         val passiveMonitoringClient = healthClient.passiveMonitoringClient
@@ -61,12 +77,24 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    private fun checkAndRequestActivityRecognitionPermission() {
+        if (checkSelfPermission(
+                android.Manifest.permission.ACTIVITY_RECOGNITION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(
+                arrayOf(android.Manifest.permission.ACTIVITY_RECOGNITION),
+                100
+            )
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
 
 
         val sharedPref = getSharedPreferences("awake_pref", Context.MODE_PRIVATE) ?: return
-        with (sharedPref.edit()) {
+        with(sharedPref.edit()) {
             putBoolean("awake_enabled", AwakeState.enabled)
             apply()
         }
@@ -74,11 +102,13 @@ class MainActivity : ComponentActivity() {
 }
 
 
-
 @Composable
 fun WearApp() {
     val state = AwakeState.awakeStateFlow.collectAsState();
     val text = if (state.value == true) "Stop" else "Start"
+
+    val alarmState = AlarmState.alarmStateFlow.collectAsState();
+    val alarmText = if (alarmState.value == true) "Active" else "Deactive"
 
     AwakeWearTheme {
         Box(
@@ -88,10 +118,19 @@ fun WearApp() {
             contentAlignment = Alignment.Center
         ) {
             TimeText()
-            RowPaddedButton(text, onClick = {
-                AwakeState.setEnabledd(!AwakeState.enabled);
-
-            })
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(text = "Alarm is $alarmText", fontSize = TextUnit(10f, TextUnitType.Sp))
+                Box(modifier = Modifier.size(18.dp))
+                RowPaddedButton(text, onClick = {
+                    AwakeState.setEnabledd(!AwakeState.enabled)
+                    if (!AwakeState.enabled) {
+                        AlarmState.setPlayingg(false)
+                        AlarmState.stopSound()
+                    }
+                })
+            }
         }
     }
 }
@@ -101,7 +140,7 @@ fun RowPaddedButton(text: String, onClick: () -> Unit = {}) {
 
     Button(
         onClick = {
-                  onClick();
+            onClick();
         },
         modifier = Modifier
             .wrapContentWidth()
